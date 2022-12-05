@@ -63,7 +63,7 @@ fn calculate_part(input: impl AsRef<str>, func: impl Fn(&str) -> u64) -> u64 {
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let input = fs::read_to_string("input")?;
+    let input = fs::read_to_string("input/2")?;
 
     println!("Part 1: {}", calculate_part(&input, part1_round_score));
     println!("Part 2: {}", calculate_part(&input, part2_round_score));

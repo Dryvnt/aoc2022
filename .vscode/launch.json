@@ -12,7 +12,7 @@
                 "args": [
                     "build",
                     "--bin=day01",
-                    "--package=day01"
+                    "--package=aoc2022"
                 ],
                 "filter": {
                     "name": "day01",
@@ -20,7 +20,7 @@
                 }
             },
             "args": [],
-            "cwd": "${workspaceFolder}/day01"
+            "cwd": "${workspaceFolder}"
         },
         {
             "type": "lldb",
@@ -30,7 +30,7 @@
                 "args": [
                     "build",
                     "--bin=day02",
-                    "--package=day02"
+                    "--package=aoc2022"
                 ],
                 "filter": {
                     "name": "day02",
@@ -38,7 +38,7 @@
                 }
             },
             "args": [],
-            "cwd": "${workspaceFolder}/day02"
+            "cwd": "${workspaceFolder}"
         },
         {
             "type": "lldb",
@@ -48,7 +48,7 @@
                 "args": [
                     "build",
                     "--bin=day03",
-                    "--package=day03"
+                    "--package=aoc2022"
                 ],
                 "filter": {
                     "name": "day03",
@@ -56,7 +56,7 @@
                 }
             },
             "args": [],
-            "cwd": "${workspaceFolder}/day03"
+            "cwd": "${workspaceFolder}"
         },
         {
             "type": "lldb",
@@ -66,7 +66,7 @@
                 "args": [
                     "build",
                     "--bin=day04",
-                    "--package=day04"
+                    "--package=aoc2022"
                 ],
                 "filter": {
                     "name": "day04",
@@ -74,7 +74,7 @@
                 }
             },
             "args": [],
-            "cwd": "${workspaceFolder}/day04"
+            "cwd": "${workspaceFolder}"
         },
     ]
 }

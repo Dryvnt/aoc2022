@@ -23,7 +23,7 @@ fn check_overlap(left_start: u32, left_end: u32, right_start: u32, right_end: u3
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let input = fs::read_to_string("input")?;
+    let input = fs::read_to_string("input/4")?;
 
     let mut part1 = 0;
     let mut part2 = 0;

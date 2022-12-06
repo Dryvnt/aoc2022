@@ -8,3 +8,6 @@ edition = "2021"
 [dependencies]
 itertools = "0.10.5"
 anyhow = "1.0.66"
+
+[dev-dependencies]
+rstest = "0.16.0"

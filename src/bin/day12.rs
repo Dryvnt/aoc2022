@@ -1,11 +1,8 @@
-use anyhow::{bail, Context, Error};
-use itertools::Itertools;
-use ndarray::{Array, Array2};
+use anyhow::{Context, Error};
+use ndarray::Array2;
 use std::{
-    cmp::Reverse,
-    collections::{BinaryHeap, HashSet, VecDeque},
-    fs, iter,
-    ops::Index,
+    collections::{HashSet, VecDeque},
+    fs,
     str::FromStr,
 };
 
@@ -45,19 +42,19 @@ impl Map {
     }
 }
 
-fn dijkstra(
+fn bfs(
     map: &Map,
     start: (usize, usize),
     check_goal: impl Fn((usize, usize)) -> bool,
     reachability: impl Fn(u64, u64) -> bool,
 ) -> Option<u64> {
-    let mut to_explore = BinaryHeap::new();
+    let mut to_explore = VecDeque::with_capacity(map.heights.len());
     let mut visited = HashSet::new();
 
     // Standard library BinaryHeap is a max-heap, so use Reverse to make it a min-heap
-    to_explore.push((Reverse(0), start));
+    to_explore.push_back((0, start));
 
-    while let Some((Reverse(d), node)) = to_explore.pop() {
+    while let Some((d, node)) = to_explore.pop_front() {
         if check_goal(node) {
             return Some(d);
         }
@@ -68,7 +65,7 @@ fn dijkstra(
         visited.insert(node);
 
         for neighbor in map.neighbors(node, &reachability) {
-            to_explore.push((Reverse(d + 1), neighbor));
+            to_explore.push_back((d + 1, neighbor));
         }
     }
     None
@@ -77,18 +74,17 @@ fn dijkstra(
 fn part1(input: &str) -> Result<u64, Error> {
     let map: Map = input.parse()?;
 
-    dijkstra(&map, map.start, |node| node == map.end, |h, n| n <= h + 1)
-        .context("could not find end")
+    bfs(&map, map.start, |node| node == map.end, |h, n| n <= h + 1).context("could not find end")
 }
 
 fn part2(input: &str) -> Result<u64, Error> {
     let map: Map = input.parse()?;
 
-    dijkstra(
+    bfs(
         &map,
         map.end,
         |node| map.heights[node] == 0,
-        |h, n| n + 1 >= h,
+        |h, n| h <= n + 1,
     )
     .context("could not find end")
 }

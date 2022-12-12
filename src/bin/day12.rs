@@ -85,7 +85,7 @@ fn part2(input: &str) -> Result<u64, Error> {
         |node| map.heights[node] == 0,
         |h, n| h <= n + 1,
     )
-    .context("could not find end")
+    .context("could not find any 'a'")
 }
 
 fn main() -> Result<(), Error> {

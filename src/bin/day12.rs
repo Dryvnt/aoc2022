@@ -51,7 +51,6 @@ fn bfs(
     let mut to_explore = VecDeque::with_capacity(map.heights.len());
     let mut visited = HashSet::new();
 
-    // Standard library BinaryHeap is a max-heap, so use Reverse to make it a min-heap
     to_explore.push_back((0, start));
 
     while let Some((d, node)) = to_explore.pop_front() {

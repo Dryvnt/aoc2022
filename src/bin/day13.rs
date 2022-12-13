@@ -171,7 +171,6 @@ impl Debug for Packet {
     }
 }
 
-// Parsing frustrates me
 impl FromStr for Packet {
     type Err = Error;
 

@@ -1,5 +1,9 @@
 use anyhow::{bail, Error};
 use itertools::Itertools;
+use nom::{
+    branch::alt, bytes::complete::tag, character::complete::digit0, combinator::map_res,
+    multi::separated_list0, IResult,
+};
 use std::{cmp::Ordering, fmt::Debug, fs, str::FromStr};
 
 #[derive(Eq, PartialEq)]
@@ -172,53 +176,27 @@ impl FromStr for Packet {
     type Err = Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if s.is_empty() {
-            bail!("malformed input")
+        fn parse_list_packet(s: &str) -> IResult<&str, Packet> {
+            let (s, _) = tag("[")(s)?;
+            let (s, out) = separated_list0(tag(","), parse_packet)(s)?;
+            let (s, _) = tag("]")(s)?;
+
+            Ok((s, Packet::List(out)))
         }
 
-        if !(s.starts_with('[') && s.ends_with(']')) {
-            return Ok(Packet::Literal(s.parse()?));
+        fn parse_literal_packet(s: &str) -> IResult<&str, Packet> {
+            let (s, literal) = map_res(digit0, |s: &str| s.parse())(s)?;
+
+            Ok((s, Packet::Literal(literal)))
         }
 
-        fn parse_list(
-            s: &str,
-            chars: &[char],
-            mut start: usize,
-        ) -> Result<(usize, Vec<Packet>), Error> {
-            let mut items = Vec::new();
-            let mut i = start;
-            while i < chars.len() {
-                let c = chars[i];
-                match c {
-                    '[' => {
-                        let (sub_end, sub_items) = parse_list(s, chars, i + 1)?;
-                        items.push(Packet::List(sub_items));
-                        i = sub_end;
-                        start = i;
-                    }
-                    ']' | ',' => {
-                        if start != i {
-                            let q = &s[start..i];
-                            items.push(Packet::Literal(q.parse()?));
-                        }
-                        start = i + 1;
-                        i += 1;
-                        if c == ']' {
-                            break;
-                        }
-                    }
-                    _ => {
-                        i += 1;
-                    }
-                }
-            }
-
-            Ok((i, items))
+        fn parse_packet(s: &str) -> IResult<&str, Packet> {
+            alt((parse_list_packet, parse_literal_packet))(s)
         }
 
-        let chars: Vec<_> = s.chars().collect();
-        let (_, items) = parse_list(s, &chars, 1)?;
-
-        Ok(Packet::List(items))
+        match parse_packet(s) {
+            Ok((_, p)) => Ok(p),
+            Err(error) => bail!("{}", error),
+        }
     }
 }

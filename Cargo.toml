@@ -9,6 +9,7 @@ edition = "2021"
 itertools = "0.10.5"
 anyhow = "1.0.66"
 ndarray = "0.15.6"
+nom = "7.1.1"
 
 [dev-dependencies]
 rstest = "0.16.0"

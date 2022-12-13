@@ -8,6 +8,16 @@ enum Packet {
     List(Vec<Packet>),
 }
 
+impl Packet {
+    fn as_slice(&self) -> &[Self] {
+        if let Self::List(items) = self {
+            items.as_slice()
+        } else {
+            std::slice::from_ref(self)
+        }
+    }
+}
+
 impl PartialOrd for Packet {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
@@ -16,29 +26,10 @@ impl PartialOrd for Packet {
 
 impl Ord for Packet {
     fn cmp(&self, other: &Self) -> Ordering {
-        fn compare_slices(left: &[Packet], right: &[Packet]) -> Ordering {
-            match (left, right) {
-                ([], []) => Ordering::Equal,
-                ([], [..]) => Ordering::Less,
-                ([..], []) => Ordering::Greater,
-                ([l, left @ ..], [r, right @ ..]) => match l.cmp(r) {
-                    Ordering::Equal => compare_slices(left, right),
-                    o => o,
-                },
-            }
-        }
-
-        match (self, other) {
-            (Packet::Literal(left), Packet::Literal(right)) => left.cmp(right),
-            (Packet::Literal(left), Packet::List(right)) => {
-                compare_slices(&[Packet::Literal(*left)], right.as_slice())
-            }
-            (Packet::List(left), Packet::Literal(right)) => {
-                compare_slices(left.as_slice(), &[Packet::Literal(*right)])
-            }
-            (Packet::List(left), Packet::List(right)) => {
-                compare_slices(left.as_slice(), right.as_slice())
-            }
+        if let (Packet::Literal(left), Packet::Literal(right)) = (self, other) {
+            left.cmp(right)
+        } else {
+            self.as_slice().cmp(other.as_slice())
         }
     }
 }

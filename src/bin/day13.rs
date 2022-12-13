@@ -63,8 +63,8 @@ fn part1(input: &str) -> Result<usize, Error> {
 fn part2(input: &str) -> Result<usize, Error> {
     let packets = get_packets(input)?;
 
-    let divider_1 = Packet::List(vec![Packet::List(vec![Packet::Literal(2)])]);
-    let divider_2 = Packet::List(vec![Packet::List(vec![Packet::Literal(6)])]);
+    let divider_1 = "[[2]]".parse()?;
+    let divider_2 = "[[6]]".parse()?;
 
     // We don't have to sort to find the positions of these :)
     let d1_pos = packets.iter().filter(|p| p < &&divider_1).count() + 1;
@@ -84,7 +84,7 @@ fn main() -> Result<(), Error> {
 
 #[cfg(test)]
 mod tests {
-    use super::{get_packets, part1, part2, Packet};
+    use super::{get_packets, part1, part2};
 
     #[test]
     fn part1_example() {
@@ -99,8 +99,8 @@ mod tests {
     #[test]
     fn packet_sorting() {
         let mut packets = get_packets(TEST_INPUT).unwrap();
-        let divider_1 = Packet::List(vec![Packet::List(vec![Packet::Literal(2)])]);
-        let divider_2 = Packet::List(vec![Packet::List(vec![Packet::Literal(6)])]);
+        let divider_1 = "[[2]]".parse().unwrap();
+        let divider_2 = "[[6]]".parse().unwrap();
         packets.push(divider_1);
         packets.push(divider_2);
         packets.sort_unstable();

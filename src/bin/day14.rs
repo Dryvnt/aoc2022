@@ -1,65 +1,61 @@
 use anyhow::{Context, Error};
 use itertools::Itertools;
-use ndarray::Array2;
-use std::{fmt::Debug, fs, str::FromStr};
-
-#[derive(Default, Clone)]
-enum Space {
-    #[default]
-    Air,
-    Rock,
-    Sand,
-}
+use std::{collections::HashSet, fs, str::FromStr};
 
 struct Map {
-    area: Array2<Space>,
+    rocks: HashSet<(usize, usize)>,
+    bottom: usize,
 }
 
 impl Map {
-    fn fill_sand(&mut self, start: (usize, usize), has_abyss: bool) {
+    fn fill_sand(&self, start: (usize, usize), has_floor: bool) -> HashSet<(usize, usize)> {
         enum Explore {
             Open((usize, usize)),
             Close((usize, usize)),
         }
 
+        let mut sand = HashSet::new();
         let mut explore_stack = vec![Explore::Open(start)];
-        let bottom = self.area.dim().1;
 
         while let Some(e) = explore_stack.pop() {
             match e {
                 Explore::Open((x, y)) => {
-                    if has_abyss && y + 1 >= bottom {
+                    if y >= self.bottom {
+                        if has_floor {
+                            continue;
+                        }
                         break;
                     }
+
                     explore_stack.push(Explore::Close((x, y)));
                     for n in [(x + 1, y + 1), (x - 1, y + 1), (x, y + 1)] {
-                        if let Some(Space::Air) = self.area.get(n) {
+                        if !(self.rocks.contains(&n) || sand.contains(&n)) {
                             explore_stack.push(Explore::Open(n));
                         }
                     }
                 }
-                Explore::Close(s) => self.area[s] = Space::Sand,
+                Explore::Close(s) => {
+                    sand.insert(s);
+                }
             }
         }
+
+        sand
     }
 }
 
 fn part1(input: &str) -> Result<usize, Error> {
-    let mut map: Map = input.parse()?;
-    map.fill_sand((500, 0), true);
+    let map: Map = input.parse()?;
+    let sand = map.fill_sand((500, 0), false);
 
-    let count = map.area.iter().filter(|s| matches!(s, Space::Sand)).count();
-
-    Ok(count)
+    Ok(sand.len())
 }
 
 fn part2(input: &str) -> Result<usize, Error> {
-    let mut map: Map = input.parse()?;
-    map.fill_sand((500, 0), false);
+    let map: Map = input.parse()?;
+    let sand = map.fill_sand((500, 0), true);
 
-    let count = map.area.iter().filter(|s| matches!(s, Space::Sand)).count();
-
-    Ok(count)
+    Ok(sand.len())
 }
 
 fn main() -> Result<(), Error> {
@@ -89,27 +85,6 @@ mod tests {
 ";
 }
 
-impl Debug for Map {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let s = self
-            .area
-            .columns()
-            .into_iter()
-            .map(|row| {
-                row.iter()
-                    .map(|s| match s {
-                        Space::Air => '.',
-                        Space::Rock => '#',
-                        Space::Sand => 'o',
-                    })
-                    .join("")
-            })
-            .join("\n");
-
-        f.write_str(&s)
-    }
-}
-
 impl FromStr for Map {
     type Err = Error;
 
@@ -129,40 +104,23 @@ impl FromStr for Map {
             lines.push(line_parts);
         }
 
-        let all_coords = lines.iter().flat_map(|l| l.iter()).collect_vec();
-        let max_x = 2 * all_coords
-            .iter()
-            .map(|&&(x, _)| x)
-            .max()
-            .context("could not find max x")?;
-        let max_y = all_coords
-            .iter()
-            .map(|&&(_, y)| y)
-            .max()
-            .context("could not find max y")?;
-
-        let dims = (max_x, max_y + 2);
-
-        let mut area = Array2::default(dims);
+        let mut rocks = HashSet::new();
 
         for line in lines {
-            let mut parts_iter = line.iter();
-            let mut s = *parts_iter.next().context("line does not have a start?")?;
-            area[s] = Space::Rock;
-
-            for &t in parts_iter {
+            for (s, t) in line.iter().tuple_windows() {
                 let x_range = if s.0 < t.0 { s.0..=t.0 } else { t.0..=s.0 };
-                for x in x_range {
-                    area[(x, s.1)] = Space::Rock;
-                }
+                rocks.extend(x_range.map(|x| (x, s.1)));
                 let y_range = if s.1 < t.1 { s.1..=t.1 } else { t.1..=s.1 };
-                for y in y_range {
-                    area[(s.0, y)] = Space::Rock;
-                }
-                s = t;
+                rocks.extend(y_range.map(|y| (s.0, y)));
             }
         }
 
-        Ok(Map { area })
+        let bottom = 2 + rocks
+            .iter()
+            .map(|(_, y)| y)
+            .max()
+            .context("could not find max y")?;
+
+        Ok(Map { rocks, bottom })
     }
 }

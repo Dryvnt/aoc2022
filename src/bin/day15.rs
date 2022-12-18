@@ -4,7 +4,6 @@ use regex::Regex;
 use std::{collections::HashSet, fs, ops::Range, str::FromStr};
 
 #[derive(Debug)]
-// A position in the rotated space, rotated 45 degrees so manhatten distance becomes max(x_dist, y_dist)
 struct Position {
     x: i64,
     y: i64,

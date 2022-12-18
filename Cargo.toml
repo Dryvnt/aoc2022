@@ -12,6 +12,7 @@ ndarray = "0.15.6"
 nom = "7.1.1"
 regex = "1.7.0"
 lazy_static = "1.4.0"
+bitvec = "1.0.1"
 
 [dev-dependencies]
 rstest = "0.16.0"

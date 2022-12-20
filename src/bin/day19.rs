@@ -1,7 +1,11 @@
-use std::{clone, collections::HashMap, fmt::Display, fs, str::FromStr};
+use std::{
+    fs,
+    ops::{Index, IndexMut},
+    str::FromStr,
+};
 
 use anyhow::{anyhow, Error};
-use itertools::Itertools;
+use itertools::iproduct;
 use nom::{
     bytes::complete::tag,
     character::complete::digit1,
@@ -11,6 +15,7 @@ use nom::{
 };
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
+#[repr(usize)]
 enum Resource {
     Ore,
     Clay,
@@ -20,75 +25,58 @@ enum Resource {
 
 impl Resource {
     const fn all() -> [Resource; 4] {
+        // Order matters - The faster we force ourselves up the tech tree, the earlier we get good lower bounds
         [
-            Resource::Ore,
-            Resource::Clay,
-            Resource::Obsidian,
             Resource::Geode,
+            Resource::Obsidian,
+            Resource::Clay,
+            Resource::Ore,
         ]
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-struct ResourceCollection {
-    ore: usize,
-    clay: usize,
-    obsidian: usize,
-}
+impl Index<Resource> for [usize; 3] {
+    type Output = usize;
 
-impl ResourceCollection {
-    fn of_type(&self, resource: Resource) -> usize {
-        match resource {
-            Resource::Ore => self.ore,
-            Resource::Clay => self.clay,
-            Resource::Obsidian => self.obsidian,
-            Resource::Geode => 0,
+    fn index(&self, index: Resource) -> &Self::Output {
+        match index {
+            Resource::Ore => &self[0],
+            Resource::Clay => &self[1],
+            Resource::Obsidian => &self[2],
+            Resource::Geode => &0,
         }
     }
 }
 
-impl Display for ResourceCollection {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let mut do_and = false;
-
-        for (name, amount) in [
-            ("ore", self.ore),
-            ("clay", self.clay),
-            ("obsidian", self.obsidian),
-        ] {
-            if amount == 0 {
-                continue;
-            }
-
-            if do_and {
-                f.write_str(" and ")?;
-            }
-            do_and = true;
-            f.write_fmt(format_args!("{} {}", amount, name))?;
+impl IndexMut<Resource> for [usize; 3] {
+    fn index_mut(&mut self, index: Resource) -> &mut Self::Output {
+        match index {
+            Resource::Ore => &mut self[0],
+            Resource::Clay => &mut self[1],
+            Resource::Obsidian => &mut self[2],
+            Resource::Geode => todo!(),
         }
-
-        Ok(())
     }
 }
 
 #[derive(Debug)]
 struct Blueprint {
     number: usize,
-    ore_robot: ResourceCollection,
-    clay_robot: ResourceCollection,
-    obsidian_robot: ResourceCollection,
-    geode_robot: ResourceCollection,
+    ore_robot: [usize; 3],
+    clay_robot: [usize; 3],
+    obsidian_robot: [usize; 3],
+    geode_robot: [usize; 3],
 
-    most_expensive: ResourceCollection,
+    most_expensive: [usize; 3],
 }
 
 impl Blueprint {
     fn new(
         number: usize,
-        ore: ResourceCollection,
-        clay: ResourceCollection,
-        obsidian: ResourceCollection,
-        geode: ResourceCollection,
+        ore: [usize; 3],
+        clay: [usize; 3],
+        obsidian: [usize; 3],
+        geode: [usize; 3],
     ) -> Self {
         let mut b = Blueprint {
             number,
@@ -96,34 +84,28 @@ impl Blueprint {
             clay_robot: clay,
             obsidian_robot: obsidian,
             geode_robot: geode,
-            most_expensive: ResourceCollection {
-                ore: 0,
-                clay: 0,
-                obsidian: 0,
-            },
+            most_expensive: [0, 0, 0],
         };
 
-        let expensive: HashMap<_, _> = Resource::all()
-            .into_iter()
-            .map(|r0| {
-                Resource::all()
-                    .into_iter()
-                    .map(|r1| (r0, b.cost_of(r1).of_type(r0)))
-                    .max()
-                    .unwrap()
-            })
-            .collect();
-
-        b.most_expensive = ResourceCollection {
-            ore: expensive[&Resource::Ore],
-            clay: expensive[&Resource::Clay],
-            obsidian: expensive[&Resource::Obsidian],
-        };
+        for (r0, r1) in iproduct!(
+            [Resource::Ore, Resource::Clay, Resource::Obsidian],
+            Resource::all()
+        ) {
+            b.most_expensive[r0] = b.most_expensive[r0].max(b[r1][r0]);
+        }
 
         b
     }
-    fn cost_of(&self, r: Resource) -> &ResourceCollection {
-        match r {
+    fn cost_of(&self, r: Resource) -> &[usize; 3] {
+        &self[r]
+    }
+}
+
+impl Index<Resource> for Blueprint {
+    type Output = [usize; 3];
+
+    fn index(&self, index: Resource) -> &Self::Output {
+        match index {
             Resource::Ore => &self.ore_robot,
             Resource::Clay => &self.clay_robot,
             Resource::Obsidian => &self.obsidian_robot,
@@ -137,11 +119,11 @@ struct State<'a> {
     remaining_ticks: usize,
     score: usize,
 
-    resources: ResourceCollection,
-    robots: ResourceCollection,
+    resources: [usize; 3],
+    robots: [usize; 3],
 
     blueprint: &'a Blueprint,
-    relevant: Vec<Resource>,
+    relevant: [Option<Resource>; 4],
 }
 
 impl<'a> State<'a> {
@@ -149,28 +131,18 @@ impl<'a> State<'a> {
         State {
             remaining_ticks: max_ticks,
             score: 0,
-            resources: ResourceCollection {
-                ore: 0,
-                clay: 0,
-                obsidian: 0,
-            },
-            robots: ResourceCollection {
-                ore: 1,
-                clay: 0,
-                obsidian: 0,
-            },
+            resources: [0, 0, 0],
+            robots: [1, 0, 0],
             blueprint,
-            relevant: Resource::all().into(),
+            relevant: Resource::all().map(Some),
         }
     }
 
-    fn can_afford(&self, cost: &ResourceCollection) -> bool {
-        self.resources.ore >= cost.ore
-            && self.resources.clay >= cost.clay
-            && self.resources.obsidian >= cost.obsidian
+    fn can_afford(&self, cost: &[usize; 3]) -> bool {
+        self.resources.iter().zip(cost.iter()).all(|(r, c)| r >= c)
     }
 
-    fn ticks_until_afford(&self, cost: &ResourceCollection) -> Option<usize> {
+    fn ticks_until_afford(&self, cost: &[usize; 3]) -> Option<usize> {
         fn weird_div_ceil(a: usize, b: usize) -> Option<usize> {
             if a == 0 {
                 Some(0)
@@ -179,55 +151,62 @@ impl<'a> State<'a> {
             }
         }
 
-        let ore_ticks =
-            weird_div_ceil(cost.ore.saturating_sub(self.resources.ore), self.robots.ore)?;
-        let clay_ticks = weird_div_ceil(
-            cost.clay.saturating_sub(self.resources.clay),
-            self.robots.clay,
-        )?;
-        let obsidian_ticks = weird_div_ceil(
-            cost.obsidian.saturating_sub(self.resources.obsidian),
-            self.robots.obsidian,
-        )?;
+        let mut max = 0;
 
-        Some(ore_ticks.max(clay_ticks).max(obsidian_ticks))
+        for (&c, (&res, &rob)) in cost
+            .iter()
+            .zip(self.resources.iter().zip(self.robots.iter()))
+        {
+            let v = weird_div_ceil(c.saturating_sub(res), rob)?;
+            max = max.max(v);
+        }
+        Some(max)
     }
 
     fn build_robot(&mut self, r: Resource) {
         match r {
-            Resource::Ore => self.robots.ore += 1,
-            Resource::Clay => self.robots.clay += 1,
-            Resource::Obsidian => self.robots.obsidian += 1,
+            Resource::Ore => self.robots[0] += 1,
+            Resource::Clay => self.robots[1] += 1,
+            Resource::Obsidian => self.robots[2] += 1,
             Resource::Geode => {
                 self.score += self.remaining_ticks;
             }
         };
     }
 
-    fn try_pay(&mut self, cost: &ResourceCollection) -> bool {
+    fn try_pay(&mut self, cost: &[usize; 3]) -> bool {
         if !self.can_afford(cost) {
             return false;
         }
-        self.resources.ore -= cost.ore;
-        self.resources.clay -= cost.clay;
-        self.resources.obsidian -= cost.obsidian;
+
+        for (r, c) in self.resources.iter_mut().zip(cost.iter()) {
+            *r -= c;
+        }
 
         true
     }
 
     fn tick(&mut self, n_ticks: usize) {
         self.remaining_ticks -= n_ticks;
-        self.resources.ore += self.robots.ore * n_ticks;
-        self.resources.clay += self.robots.clay * n_ticks;
-        self.resources.obsidian += self.robots.obsidian * n_ticks;
+        for i in 0..3 {
+            self.resources[i] += self.robots[i] * n_ticks;
+        }
 
-        self.relevant.retain(|&r| {
-            let highest_cost = self.blueprint.most_expensive.of_type(r);
-            let max_required = self.remaining_ticks * highest_cost;
-            let min_available =
-                self.resources.of_type(r) + self.remaining_ticks * self.robots.of_type(r);
-            max_required <= min_available
-        });
+        for o in self.relevant.iter_mut() {
+            if matches!(o, Some(Resource::Geode)) {
+                continue;
+            }
+
+            if let Some(r) = o {
+                let r = *r;
+                let highest_cost = self.blueprint.most_expensive[r];
+                let max_required = self.remaining_ticks * highest_cost;
+                let min_available = self.resources[r] + self.remaining_ticks * self.robots[r];
+                if max_required <= min_available {
+                    *o = None;
+                }
+            }
+        }
     }
 
     fn try_wait_and_build(&mut self, r: Resource) -> bool {
@@ -248,10 +227,10 @@ impl<'a> State<'a> {
     }
 
     fn upper_bound(&self) -> usize {
-        let mut cheaper_obsidian = self.blueprint.obsidian_robot.clone();
-        cheaper_obsidian.ore = 0;
-        let mut cheaper_geode = self.blueprint.geode_robot.clone();
-        cheaper_geode.ore = 0;
+        let mut cheaper_obsidian = self.blueprint.obsidian_robot;
+        cheaper_obsidian[0] = 0;
+        let mut cheaper_geode = self.blueprint.geode_robot;
+        cheaper_geode[0] = 0;
 
         let mut s = self.clone();
         while s.remaining_ticks > 0 {
@@ -289,7 +268,7 @@ fn explore_blueprint(b: &Blueprint, max_ticks: usize) -> usize {
         let lower_bound = state.score;
         best_lower_bound = best_lower_bound.max(lower_bound);
 
-        for &r in &state.relevant {
+        for r in state.relevant.iter().filter_map(|&r| r) {
             let mut state = state.clone();
             if state.try_wait_and_build(r) {
                 let upper_bound = state.upper_bound();
@@ -343,22 +322,7 @@ fn main() -> Result<(), Error> {
 mod tests {
     use std::str::FromStr;
 
-    use itertools::Itertools;
-
     use crate::{explore_blueprint, part1, Blueprint};
-
-    #[test]
-    fn parsing() {
-        let blueprints = TEST_INPUT
-            .lines()
-            .map(Blueprint::from_str)
-            .collect::<Result<Vec<Blueprint>, _>>()
-            .unwrap();
-
-        let blueprints_str = blueprints.iter().map(|b| format!("{}\n", b)).join("");
-
-        assert_eq!(blueprints_str, TEST_INPUT);
-    }
 
     #[test]
     fn part1_example() {
@@ -381,12 +345,6 @@ Blueprint 2: Each ore robot costs 2 ore. Each clay robot costs 3 ore. Each obsid
 ";
 }
 
-impl Display for Blueprint {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_fmt(format_args!("Blueprint {}: Each ore robot costs {}. Each clay robot costs {}. Each obsidian robot costs {}. Each geode robot costs {}.", self.number, self.ore_robot, self.clay_robot, self.obsidian_robot, self.geode_robot))
-    }
-}
-
 impl FromStr for Blueprint {
     type Err = Error;
 
@@ -400,7 +358,7 @@ impl FromStr for Blueprint {
             }
         }
 
-        fn parse_cost(s: &str) -> IResult<&str, ResourceCollection> {
+        fn parse_cost(s: &str) -> IResult<&str, [usize; 3]> {
             let (s, ore) = parse_cost_part("ore")(s)?;
 
             let (s, opt_clay) = opt(pair(tag(" and "), parse_cost_part("clay")))(s)?;
@@ -409,14 +367,7 @@ impl FromStr for Blueprint {
             let clay = opt_clay.map(|(_, v)| v).unwrap_or_default();
             let obsidian = opt_obsidian.map(|(_, v)| v).unwrap_or_default();
 
-            Ok((
-                s,
-                ResourceCollection {
-                    ore,
-                    clay,
-                    obsidian,
-                },
-            ))
+            Ok((s, [ore, clay, obsidian]))
         }
         fn parse_blueprint(s: &str) -> IResult<&str, Blueprint> {
             let (s, _) = tag("Blueprint ")(s)?;

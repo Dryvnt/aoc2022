@@ -1,10 +1,4 @@
-use std::{
-    cell::RefCell,
-    collections::HashMap,
-    fs,
-    ops::Index,
-    sync::atomic::{AtomicU64, Ordering},
-};
+use std::{collections::HashMap, fs};
 
 use anyhow::{anyhow, bail, Context, Error};
 use nom::{

@@ -1,6 +1,6 @@
 use std::{collections::HashSet, fmt::Display, fs, str::FromStr};
 
-use anyhow::{anyhow, bail, Context, Error};
+use anyhow::{anyhow, Error};
 use itertools::Itertools;
 
 // Doubly linked list

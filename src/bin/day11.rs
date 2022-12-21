@@ -4,7 +4,7 @@ use nom::{
     bytes::complete::tag,
     character::complete::{char, digit1, multispace0},
     combinator::{map_res, value},
-    multi::{self, many1, separated_list1},
+    multi::{many1, separated_list1},
     sequence::tuple,
     IResult,
 };
